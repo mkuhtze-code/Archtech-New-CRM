@@ -27,6 +27,7 @@ export const FlashingProfile3D: React.FC<Props> = ({
   const hostRef = useRef<HTMLDivElement>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const fitDistanceRef = useRef(360);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -71,17 +72,12 @@ export const FlashingProfile3D: React.FC<Props> = ({
 
     const profileGroup = new THREE.Group();
     scene.add(profileGroup);
-    const fitGroup = new THREE.Group();
-    scene.add(fitGroup);
 
     const materialPainted = new THREE.MeshStandardMaterial({
       color: '#b91c1c', metalness: 0.48, roughness: 0.3, side: THREE.DoubleSide
     });
     const materialUnpainted = new THREE.MeshStandardMaterial({
       color: '#9aa7b8', metalness: 0.72, roughness: 0.28, side: THREE.DoubleSide
-    });
-    const materialEdge = new THREE.MeshStandardMaterial({
-      color: '#64748b', metalness: 0.7, roughness: 0.32, side: THREE.DoubleSide
     });
     const grid = new THREE.GridHelper(1000, 40, 0x334155, 0x1e293b);
     grid.position.y = -0.02;
@@ -147,6 +143,7 @@ export const FlashingProfile3D: React.FC<Props> = ({
       profileGroup.position.sub(centre);
       const maxDim = Math.max(size.x, size.y, size.z, 1);
       camera.position.set(maxDim * 1.05, maxDim * 0.75, maxDim * 1.65);
+      fitDistanceRef.current = camera.position.length();
       camera.near = Math.max(0.1, maxDim / 1000);
       camera.far = maxDim * 100;
       camera.updateProjectionMatrix();
@@ -156,6 +153,15 @@ export const FlashingProfile3D: React.FC<Props> = ({
       grid.scale.setScalar(Math.max(1, maxDim / 600));
       grid.position.y = -size.y * 0.55;
     }
+
+    const syncRotation = () => {
+      const offset = camera.position.clone().sub(controls.target);
+      const length = Math.max(0.001, offset.length());
+      const yaw = Math.atan2(offset.x, offset.z);
+      const pitch = Math.asin(clamp(offset.y / length, -1, 1));
+      onRotationChange({ yaw, pitch });
+    };
+    controls.addEventListener('change', syncRotation);
 
     const resize = () => {
       const width = Math.max(1, host.clientWidth);
@@ -186,6 +192,7 @@ export const FlashingProfile3D: React.FC<Props> = ({
     return () => {
       cancelAnimationFrame(frame);
       observer.disconnect();
+      controls.removeEventListener('change', syncRotation);
       controls.dispose();
       controlsRef.current = null;
       cameraRef.current = null;
@@ -197,7 +204,6 @@ export const FlashingProfile3D: React.FC<Props> = ({
       });
       materialPainted.dispose();
       materialUnpainted.dispose();
-      materialEdge.dispose();
       grid.geometry.dispose();
       (Array.isArray(grid.material) ? grid.material : [grid.material]).forEach(m => m.dispose());
       renderer.dispose();
@@ -205,7 +211,7 @@ export const FlashingProfile3D: React.FC<Props> = ({
     };
   // Rebuild the physical mesh when geometry or finish changes.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [points, paintSide]);
+  }, [points, paintSide, onRotationChange]);
 
   useEffect(() => {
     const camera = cameraRef.current;
@@ -214,8 +220,7 @@ export const FlashingProfile3D: React.FC<Props> = ({
     const factor = clamp(zoom, 0.25, 5);
     const target = controls.target;
     const offset = camera.position.clone().sub(target);
-    const currentDistance = offset.length();
-    const desired = Math.max(0.1, currentDistance * (1 / factor));
+    const desired = Math.max(0.1, fitDistanceRef.current / factor);
     offset.setLength(desired);
     camera.position.copy(target).add(offset);
     controls.update();
