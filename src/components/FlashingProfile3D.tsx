@@ -74,10 +74,12 @@ export const FlashingProfile3D: React.FC<Props> = ({
     scene.add(profileGroup);
 
     const materialPainted = new THREE.MeshStandardMaterial({
-      color: '#b91c1c', metalness: 0.48, roughness: 0.3, side: THREE.DoubleSide
+      color: '#d71920', metalness: 0.28, roughness: 0.42,
+      side: THREE.DoubleSide, transparent: false, opacity: 1, depthWrite: true
     });
     const materialUnpainted = new THREE.MeshStandardMaterial({
-      color: '#9aa7b8', metalness: 0.72, roughness: 0.28, side: THREE.DoubleSide
+      color: '#aeb8c4', metalness: 0.52, roughness: 0.38,
+      side: THREE.DoubleSide, transparent: false, opacity: 1, depthWrite: true
     });
     const grid = new THREE.GridHelper(1000, 40, 0x334155, 0x1e293b);
     grid.position.y = -0.02;
@@ -88,48 +90,60 @@ export const FlashingProfile3D: React.FC<Props> = ({
       const origin = points[0];
       const profile = points.map(p => new THREE.Vector3(p.x - origin.x, -(p.y - origin.y), 0));
       const profileLength = points.reduce((sum, p, i) => i ? sum + dist(points[i - 1], p) : sum, 0);
-      const depth = clamp(profileLength * 0.22, 18, 90);
+      // The extrusion length is intentionally much longer than the developed
+      // cross-section (roughly 4:1) so the preview reads as a length of flashing.
+      const depth = clamp(profileLength * 4, 1200, 6000);
       const zFront = depth / 2;
       const zBack = -depth / 2;
-      const paintedOnFront = paintSide !== 'inside' && paintSide !== 'right';
+      const sheetThickness = 1.2;
+      const paintedOnPositiveNormal = paintSide !== 'inside' && paintSide !== 'right';
 
-      // Each profile leg is a real sheet-metal panel between the front/back
-      // planes. Faces have separate materials so the paint side is physical.
+      // Each leg is a solid, opaque sheet panel. The two faces are offset along
+      // the leg normal (not overlapped coplanar quads), preventing z-fighting.
       points.slice(0, -1).forEach((_, i) => {
         const a = profile[i], b = profile[i + 1];
-        const frontGeometry = new THREE.BufferGeometry();
-        frontGeometry.setAttribute('position', new THREE.Float32BufferAttribute([
-          a.x, a.y, zFront, b.x, b.y, zFront, b.x, b.y, zBack, a.x, a.y, zBack
-        ], 3));
-        frontGeometry.setIndex([0, 1, 2, 0, 2, 3]);
-        frontGeometry.computeVertexNormals();
+        const dx = b.x - a.x, dy = b.y - a.y;
+        const legLength = Math.max(1e-6, Math.hypot(dx, dy));
+        const nx = -dy / legLength, ny = dx / legLength;
+        const faceOffset = sheetThickness / 2;
+        const plusA = new THREE.Vector3(a.x + nx * faceOffset, a.y + ny * faceOffset, 0);
+        const plusB = new THREE.Vector3(b.x + nx * faceOffset, b.y + ny * faceOffset, 0);
+        const minusA = new THREE.Vector3(a.x - nx * faceOffset, a.y - ny * faceOffset, 0);
+        const minusB = new THREE.Vector3(b.x - nx * faceOffset, b.y - ny * faceOffset, 0);
 
-        const frontMesh = new THREE.Mesh(frontGeometry, paintedOnFront ? materialPainted : materialUnpainted);
-        profileGroup.add(frontMesh);
+        const quad = (p1: THREE.Vector3, p2: THREE.Vector3, z1: number, z2: number) => {
+          const geometry = new THREE.BufferGeometry();
+          geometry.setAttribute('position', new THREE.Float32BufferAttribute([
+            p1.x, p1.y, z1, p2.x, p2.y, z1,
+            p2.x, p2.y, z2, p1.x, p1.y, z2
+          ], 3));
+          geometry.setIndex([0, 1, 2, 0, 2, 3]);
+          geometry.computeVertexNormals();
+          return geometry;
+        };
 
-        // Opposite face: same physical panel, opposite finish.
-        const backGeometry = new THREE.BufferGeometry();
-        backGeometry.setAttribute('position', new THREE.Float32BufferAttribute([
-          a.x, a.y, zBack, b.x, b.y, zBack, b.x, b.y, zFront, a.x, a.y, zFront
-        ], 3));
-        backGeometry.setIndex([0, 1, 2, 0, 2, 3]);
-        backGeometry.computeVertexNormals();
-        const backMesh = new THREE.Mesh(backGeometry, paintedOnFront ? materialUnpainted : materialPainted);
-        profileGroup.add(backMesh);
+        const positiveFace = new THREE.Mesh(quad(plusA, plusB, zFront, zBack),
+          paintedOnPositiveNormal ? materialPainted : materialUnpainted);
+        const negativeFace = new THREE.Mesh(quad(minusA, minusB, zFront, zBack),
+          paintedOnPositiveNormal ? materialUnpainted : materialPainted);
+        profileGroup.add(positiveFace, negativeFace);
 
-        // Thin exposed sheet edge at each fold line.
-        const edgePoints = [
-          new THREE.Vector3(a.x, a.y, zFront),
-          new THREE.Vector3(b.x, b.y, zFront),
-          new THREE.Vector3(b.x, b.y, zBack),
-          new THREE.Vector3(a.x, a.y, zBack),
-          new THREE.Vector3(a.x, a.y, zFront)
+        // Close the cut ends and the small thickness at each end of this leg.
+        const edgeVertices = [
+          new THREE.Vector3(plusA.x, plusA.y, zFront),
+          new THREE.Vector3(minusA.x, minusA.y, zFront),
+          new THREE.Vector3(minusB.x, minusB.y, zFront),
+          new THREE.Vector3(plusB.x, plusB.y, zFront),
+          new THREE.Vector3(plusA.x, plusA.y, zFront),
+          new THREE.Vector3(plusA.x, plusA.y, zBack),
+          new THREE.Vector3(minusA.x, minusA.y, zBack),
+          new THREE.Vector3(minusA.x, minusA.y, zFront)
         ];
-        const edgeGeometry = new THREE.BufferGeometry().setFromPoints(edgePoints);
+        const edgeGeometry = new THREE.BufferGeometry().setFromPoints(edgeVertices);
         profileGroup.add(new THREE.Line(edgeGeometry, new THREE.LineBasicMaterial({ color: '#e2e8f0' })));
       });
 
-      // Show the profile's actual cut edges, making the sheet thickness/depth legible.
+      // Trace both long profile edges to make the sheet's full extrusion length clear.
       [zFront, zBack].forEach(z => {
         const edge = new THREE.BufferGeometry().setFromPoints(
           profile.map(p => new THREE.Vector3(p.x, p.y, z))
@@ -142,13 +156,14 @@ export const FlashingProfile3D: React.FC<Props> = ({
       const centre = box.getCenter(new THREE.Vector3());
       profileGroup.position.sub(centre);
       const maxDim = Math.max(size.x, size.y, size.z, 1);
-      const initialDistance = maxDim * 2.05;
+      const fitDistance = maxDim * 2.05;
+      const initialDistance = fitDistance / clamp(zoom, 0.25, 5);
       camera.position.set(
         Math.sin(rotation.yaw) * Math.cos(rotation.pitch) * initialDistance,
         Math.sin(rotation.pitch) * initialDistance,
         Math.cos(rotation.yaw) * Math.cos(rotation.pitch) * initialDistance
       );
-      fitDistanceRef.current = camera.position.length();
+      fitDistanceRef.current = fitDistance;
       camera.near = Math.max(0.1, maxDim / 1000);
       camera.far = maxDim * 100;
       camera.updateProjectionMatrix();
@@ -212,7 +227,7 @@ export const FlashingProfile3D: React.FC<Props> = ({
     };
   // Rebuild the physical mesh when geometry or finish changes.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [points, paintSide, onRotationChange, rotation.yaw, rotation.pitch]);
+  }, [points, paintSide]);
 
   useEffect(() => {
     const camera = cameraRef.current;
