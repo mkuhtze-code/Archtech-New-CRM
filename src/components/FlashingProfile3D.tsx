@@ -156,13 +156,14 @@ export const FlashingProfile3D: React.FC<Props> = ({
       const centre = box.getCenter(new THREE.Vector3());
       profileGroup.position.sub(centre);
       const maxDim = Math.max(size.x, size.y, size.z, 1);
-      const initialDistance = maxDim * 2.05;
+      const fitDistance = maxDim * 2.05;
+      const initialDistance = fitDistance / clamp(zoom, 0.25, 5);
       camera.position.set(
         Math.sin(rotation.yaw) * Math.cos(rotation.pitch) * initialDistance,
         Math.sin(rotation.pitch) * initialDistance,
         Math.cos(rotation.yaw) * Math.cos(rotation.pitch) * initialDistance
       );
-      fitDistanceRef.current = camera.position.length();
+      fitDistanceRef.current = fitDistance;
       camera.near = Math.max(0.1, maxDim / 1000);
       camera.far = maxDim * 100;
       camera.updateProjectionMatrix();
@@ -226,7 +227,7 @@ export const FlashingProfile3D: React.FC<Props> = ({
     };
   // Rebuild the physical mesh when geometry or finish changes.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [points, paintSide, onRotationChange, rotation.yaw, rotation.pitch]);
+  }, [points, paintSide]);
 
   useEffect(() => {
     const camera = cameraRef.current;
