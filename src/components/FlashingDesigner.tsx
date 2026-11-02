@@ -227,6 +227,16 @@ export const FlashingDesigner: React.FC<Props> = ({
     onUpdateProject({ ...project, flashingProfiles: next } as Project);
   };
 
+  // Keep the paint-face choice consistent between the 2D indicator, 3D view and saved profile.
+  const handlePaintSideChange = (side: PaintSide) => {
+    setPaintSide(side);
+    if (!selected) return;
+    persistProfiles(profiles.map((p) => p.id === selected.id
+      ? { ...p, paintSide: side, updatedAt: new Date().toISOString() }
+      : p
+    ));
+  };
+
   // Model-to-screen scale factor (model units per screen pixel)
   const modelUnitsPerScreenPixel = useMemo(() => {
     const clientW = svgRef.current?.clientWidth || 600;
@@ -787,32 +797,38 @@ export const FlashingDesigner: React.FC<Props> = ({
     return `M ${points[points.length - 1].x} ${points[points.length - 1].y} L ${cursor.x} ${cursor.y}`;
   }, [mode, points, cursor]);
 
-  // Painted face parallel offset path
+  // Painted-face indicator follows a continuous offset of the actual profile.
+  // Averaged vertex normals avoid the side-switching/jagged effect at bends.
   const paintedFacePath = useMemo(() => {
     if (points.length < 2) return '';
-    const offsetMm = (paintSide === 'outside' ? 2.5 : -2.5) * modelUnitsPerScreenPixel;
-    const offsetPts: Point2D[] = [];
-
-    for (let i = 0; i < points.length; i++) {
-      let normal: Point2D = { x: 0, y: -1 };
-      if (i < points.length - 1) {
-        const p1 = points[i];
-        const p2 = points[i + 1];
-        const d = dist(p1, p2);
-        if (d > 1e-4) {
-          normal = { x: -(p2.y - p1.y) / d, y: (p2.x - p1.x) / d };
-        }
-      } else {
-        const p0 = points[i - 1];
-        const p1 = points[i];
-        const d = dist(p0, p1);
-        if (d > 1e-4) {
-          normal = { x: -(p1.y - p0.y) / d, y: (p1.x - p0.x) / d };
-        }
-      }
-      offsetPts.push({ x: points[i].x + normal.x * offsetMm, y: points[i].y + normal.y * offsetMm });
+    const sideSign = paintSide === 'inside' ? -1 : 1;
+    const offsetPx = 2.5 * modelUnitsPerScreenPixel;
+    const segmentNormals: Point2D[] = [];
+    for (let i = 0; i < points.length - 1; i++) {
+      const a = points[i], b = points[i + 1];
+      const length = dist(a, b);
+      if (length < 1e-6) segmentNormals.push({ x: 0, y: -1 });
+      else segmentNormals.push({ x: -(b.y - a.y) / length, y: (b.x - a.x) / length });
     }
-    return offsetPts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+    const offsetPoints = points.map((point, i) => {
+      let normal = i === 0 ? segmentNormals[0] : i === points.length - 1
+        ? segmentNormals[segmentNormals.length - 1]
+        : normalize({
+            x: segmentNormals[i - 1].x + segmentNormals[i].x,
+            y: segmentNormals[i - 1].y + segmentNormals[i].y
+          });
+      // Correct the offset at a corner so the distance remains stable; cap acute-corner miters.
+      let denominator = 1;
+      if (i > 0 && i < points.length - 1) {
+        denominator = Math.abs(normal.x * segmentNormals[i].x + normal.y * segmentNormals[i].y);
+      }
+      const miter = Math.min(2.5, 1 / Math.max(0.4, denominator));
+      return {
+        x: point.x + normal.x * offsetPx * sideSign * miter,
+        y: point.y + normal.y * offsetPx * sideSign * miter
+      };
+    });
+    return offsetPoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
   }, [points, paintSide, modelUnitsPerScreenPixel]);
 
   // Selected Segment & Bend objects
@@ -972,7 +988,7 @@ export const FlashingDesigner: React.FC<Props> = ({
           onWheel={handleWheel}
         >
           {viewMode === '3d' && (
-            <FlashingProfile3D points={points} paintSide={paintSide} onPaintSideChange={setPaintSide}
+            <FlashingProfile3D points={points} paintSide={paintSide} onPaintSideChange={handlePaintSideChange}
               rotation={rotation} onRotationChange={setRotation} zoom={zoom3d} onZoomChange={setZoom3d} />
           )}
           <svg
@@ -1386,7 +1402,7 @@ export const FlashingDesigner: React.FC<Props> = ({
                   <span className="text-slate-400">Finished Face</span>
                   <div className="flex gap-1">
                     <button
-                      onClick={() => setPaintSide('outside')}
+                      onClick={() => handlePaintSideChange('outside')}
                       className={`px-2.5 py-1 rounded text-xs font-bold cursor-pointer ${
                         paintSide === 'outside'
                           ? 'bg-red-500 text-white'
@@ -1396,7 +1412,7 @@ export const FlashingDesigner: React.FC<Props> = ({
                       Outside
                     </button>
                     <button
-                      onClick={() => setPaintSide('inside')}
+                      onClick={() => handlePaintSideChange('inside')}
                       className={`px-2.5 py-1 rounded text-xs font-bold cursor-pointer ${
                         paintSide === 'inside'
                           ? 'bg-red-500 text-white'
