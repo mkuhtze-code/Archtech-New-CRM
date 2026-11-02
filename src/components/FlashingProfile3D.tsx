@@ -142,7 +142,12 @@ export const FlashingProfile3D: React.FC<Props> = ({
       const centre = box.getCenter(new THREE.Vector3());
       profileGroup.position.sub(centre);
       const maxDim = Math.max(size.x, size.y, size.z, 1);
-      camera.position.set(maxDim * 1.05, maxDim * 0.75, maxDim * 1.65);
+      const initialDistance = maxDim * 2.05;
+      camera.position.set(
+        Math.sin(rotation.yaw) * Math.cos(rotation.pitch) * initialDistance,
+        Math.sin(rotation.pitch) * initialDistance,
+        Math.cos(rotation.yaw) * Math.cos(rotation.pitch) * initialDistance
+      );
       fitDistanceRef.current = camera.position.length();
       camera.near = Math.max(0.1, maxDim / 1000);
       camera.far = maxDim * 100;
@@ -161,7 +166,7 @@ export const FlashingProfile3D: React.FC<Props> = ({
       const pitch = Math.asin(clamp(offset.y / length, -1, 1));
       onRotationChange({ yaw, pitch });
     };
-    controls.addEventListener('change', syncRotation);
+    controls.addEventListener('end', syncRotation);
 
     const resize = () => {
       const width = Math.max(1, host.clientWidth);
@@ -183,16 +188,14 @@ export const FlashingProfile3D: React.FC<Props> = ({
     render();
     setReady(true);
 
-    // Seed the initial view from the designer's persisted rotation/zoom.
-    controls.rotateLeft(rotation.yaw);
-    controls.rotateUp(rotation.pitch);
+    // Apply persisted zoom to the initial fitted camera distance.
     camera.position.multiplyScalar(1 / clamp(zoom, 0.25, 5));
     controls.update();
 
     return () => {
       cancelAnimationFrame(frame);
       observer.disconnect();
-      controls.removeEventListener('change', syncRotation);
+      controls.removeEventListener('end', syncRotation);
       controls.dispose();
       controlsRef.current = null;
       cameraRef.current = null;
@@ -211,7 +214,7 @@ export const FlashingProfile3D: React.FC<Props> = ({
     };
   // Rebuild the physical mesh when geometry or finish changes.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [points, paintSide, onRotationChange]);
+  }, [points, paintSide, onRotationChange, rotation.yaw, rotation.pitch, zoom]);
 
   useEffect(() => {
     const camera = cameraRef.current;
