@@ -412,10 +412,13 @@ export const FlashingDesigner: React.FC<Props> = ({
     }
   };
 
-  // Update a single segment's length, angle or kind with instant geometry regeneration
+  // Update a single segment from the current live geometry. This also works
+  // before a newly drawn profile has been saved to the project.
   const updateSegmentAt = (index: number, patch: Partial<FlashingSegment>) => {
-    if (!selected || index < 0 || index >= selected.segments.length) return;
-    const safePatch = { ...patch };
+    const baseSegments = selected?.segments || pointsToSegments(points, 1.0);
+    if (index < 0 || index >= baseSegments.length) return;
+
+    const safePatch: Partial<FlashingSegment> = { ...patch };
     if (typeof safePatch.lengthMm === 'number') {
       safePatch.lengthMm = Math.max(1, Math.min(10000, safePatch.lengthMm));
     }
@@ -423,33 +426,32 @@ export const FlashingDesigner: React.FC<Props> = ({
       safePatch.angleDeg = Math.max(1, Math.min(179, safePatch.angleDeg));
     }
 
-    const segs = selected.segments.map((s, i) => (i === index ? { ...s, ...safePatch } : s));
+    const segs = baseSegments.map((segment, i) => i === index ? { ...segment, ...safePatch } : segment);
     const origin = points[0] || { x: 50, y: 150 };
-    const startHeadingDeg =
-      points.length >= 2
-        ? (Math.atan2(-(points[1].y - points[0].y), points[1].x - points[0].x) * 180) / Math.PI
-        : (selected.startHeadingDeg ?? 0);
-
+    const startHeadingDeg = points.length >= 2
+      ? (Math.atan2(-(points[1].y - points[0].y), points[1].x - points[0].x) * 180) / Math.PI
+      : (selected?.startHeadingDeg ?? 0);
     const newPts = segmentsToPoints(segs, origin, 1.0, startHeadingDeg);
     setPoints(newPts);
 
+    // Unsaved/drawn profiles stay local until the user explicitly saves them.
+    if (!selected) return;
+
     const blank = calculateDevelopedBlankWidth(segs, selected.thicknessMm || 0.55);
     const tier = classifyGirthTier(blank);
-
-    const next = profiles.map((p) =>
-      p.id === selected.id
-        ? {
-            ...p,
-            segments: segs,
-            geometryPointsMm: pointsToGeometryMm(newPts, 1.0),
-            startHeadingDeg,
-            developedLengthMm: blank,
-            developedBlankWidthMm: blank,
-            girthTier: tier,
-            paintSide,
-            updatedAt: new Date().toISOString()
-          }
-        : p
+    const next = profiles.map((p) => p.id === selected.id
+      ? {
+          ...p,
+          segments: segs,
+          geometryPointsMm: pointsToGeometryMm(newPts, 1.0),
+          startHeadingDeg,
+          developedLengthMm: blank,
+          developedBlankWidthMm: blank,
+          girthTier: tier,
+          paintSide,
+          updatedAt: new Date().toISOString()
+        }
+      : p
     );
     persistProfiles(next);
   };
@@ -1103,7 +1105,10 @@ export const FlashingDesigner: React.FC<Props> = ({
               // Short legs stay uncluttered; labels reappear automatically when zoomed in.
               if (legPixels < 34) return null;
               return (
-                <g key={`dim-${dim.segIndex}`} onClick={(e) => {
+                <g key={`dim-${dim.segIndex}`}
+                  onPointerDown={(e) => { e.stopPropagation(); }}
+                  onPointerUp={(e) => { e.stopPropagation(); }}
+                  onClick={(e) => {
                   e.stopPropagation();
                   setSelectedSegIndex(dim.segIndex);
                   setSelectedBendIndex(null);
@@ -1129,6 +1134,8 @@ export const FlashingDesigner: React.FC<Props> = ({
               return (
                 <g
                   key={`bend-${bend.bendIndex}`}
+                  onPointerDown={(e) => { e.stopPropagation(); }}
+                  onPointerUp={(e) => { e.stopPropagation(); }}
                   onClick={(e) => {
                     e.stopPropagation();
                     setSelectedBendIndex(bend.bendIndex);
