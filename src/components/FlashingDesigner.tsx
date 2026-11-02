@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { FlashingProfile3D } from './FlashingProfile3D';
 import {
   Project,
   FlashingProfile,
@@ -854,6 +855,8 @@ export const FlashingDesigner: React.FC<Props> = ({
 
         {/* Center Mode Controls */}
         <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 p-0.5 rounded-lg text-xs font-semibold">
+          <button onClick={() => setViewMode('profile')} className={`px-2.5 py-1 rounded-md transition-all ${viewMode === 'profile' ? 'bg-sky-700 text-white' : 'text-slate-400 hover:text-white'}`}>2D</button>
+          <button onClick={() => setViewMode('3d')} className={`px-2.5 py-1 rounded-md transition-all ${viewMode === '3d' ? 'bg-red-700 text-white' : 'text-slate-400 hover:text-white'}`}>3D</button>
           <button
             onClick={() => setMode('draw')}
             className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
@@ -968,10 +971,14 @@ export const FlashingDesigner: React.FC<Props> = ({
           className="flex-1 h-full relative overflow-hidden bg-[#070b12] touch-none cursor-crosshair"
           onWheel={handleWheel}
         >
+          {viewMode === '3d' && (
+            <FlashingProfile3D points={points} paintSide={paintSide} onPaintSideChange={setPaintSide}
+              rotation={rotation} onRotationChange={setRotation} zoom={zoom3d} onZoomChange={setZoom3d} />
+          )}
           <svg
             ref={svgRef}
             viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.w} ${viewBox.h}`}
-            className="w-full h-full touch-none select-none"
+            className={`w-full h-full touch-none select-none ${viewMode === '3d' ? 'hidden' : ''}`}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
@@ -1071,108 +1078,22 @@ export const FlashingDesigner: React.FC<Props> = ({
               </g>
             )}
 
-            {/* VARIOBEND PARALLEL TECHNICAL DIMENSION LINES */}
+            {/* Variobend-style in-leg labels: no witness lines, leaders or external dimensions */}
             {legDimensions.map((dim) => {
               const isSelected = selectedSegIndex === dim.segIndex;
-              const lineColor = isSelected ? '#38bdf8' : '#64748b';
-              const textColor = isSelected ? '#f8fafc' : '#cbd5e1';
-              const bgColor = isSelected ? '#0369a1' : '#0f172a';
-              const borderColor = isSelected ? '#7dd3fc' : '#334155';
               const u = modelUnitsPerScreenPixel;
-
+              const legPixels = dist(dim.p1, dim.p2) / u;
+              // Short legs stay uncluttered; labels reappear automatically when zoomed in.
+              if (legPixels < 34) return null;
               return (
-                <g
-                  key={`dim-${dim.segIndex}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSelectedSegIndex(dim.segIndex);
-                    setSelectedBendIndex(null);
-                  }}
-                  className="cursor-pointer group"
-                >
-                  {/* Witness Lines */}
-                  <line
-                    x1={dim.witness1Start.x}
-                    y1={dim.witness1Start.y}
-                    x2={dim.witness1End.x}
-                    y2={dim.witness1End.y}
-                    stroke="#475569"
-                    strokeWidth={1 * u}
-                    strokeDasharray={`${3 * u} ${2 * u}`}
-                  />
-                  <line
-                    x1={dim.witness2Start.x}
-                    y1={dim.witness2Start.y}
-                    x2={dim.witness2End.x}
-                    y2={dim.witness2End.y}
-                    stroke="#475569"
-                    strokeWidth={1 * u}
-                    strokeDasharray={`${3 * u} ${2 * u}`}
-                  />
-
-                  {/* Main Dimension Line */}
-                  <line
-                    x1={dim.dimP1.x}
-                    y1={dim.dimP1.y}
-                    x2={dim.dimP2.x}
-                    y2={dim.dimP2.y}
-                    stroke={lineColor}
-                    strokeWidth={1.2 * u}
-                  />
-
-                  {/* 45° Architectural Witness Ticks */}
-                  <line
-                    x1={dim.tick1P1.x}
-                    y1={dim.tick1P1.y}
-                    x2={dim.tick1P2.x}
-                    y2={dim.tick1P2.y}
-                    stroke={lineColor}
-                    strokeWidth={1.5 * u}
-                  />
-                  <line
-                    x1={dim.tick2P1.x}
-                    y1={dim.tick2P1.y}
-                    x2={dim.tick2P2.x}
-                    y2={dim.tick2P2.y}
-                    stroke={lineColor}
-                    strokeWidth={1.5 * u}
-                  />
-
-                  {/* Exterior leader line if short segment */}
-                  {dim.arrowLeaderPath && (
-                    <path
-                      d={dim.arrowLeaderPath}
-                      fill="none"
-                      stroke={lineColor}
-                      strokeWidth={1 * u}
-                    />
-                  )}
-
-                  {/* Crisp Numeric Dimension Label (Constant Screen-Space Scale) */}
-                  <g
-                    transform={`translate(${dim.textAnchor.x} ${dim.textAnchor.y}) rotate(${dim.textAngleDeg}) scale(${u})`}
-                  >
-                    <rect
-                      x="-26"
-                      y="-10"
-                      width="52"
-                      height="20"
-                      rx="4"
-                      fill={bgColor}
-                      stroke={borderColor}
-                      strokeWidth="1"
-                    />
-                    <text
-                      x="0"
-                      y="4"
-                      textAnchor="middle"
-                      fill={textColor}
-                      fontSize="11"
-                      fontFamily="ui-monospace, monospace"
-                      fontWeight="bold"
-                    >
-                      {dim.lengthMm}
-                    </text>
+                <g key={`dim-${dim.segIndex}`} onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedSegIndex(dim.segIndex);
+                  setSelectedBendIndex(null);
+                }} className="cursor-pointer">
+                  <g transform={`translate(${dim.midpoint.x} ${dim.midpoint.y}) scale(${u})`}>
+                    <rect x="-24" y="-9" width="48" height="18" rx="3" fill={isSelected ? "#075985" : "#111827"} stroke={isSelected ? "#7dd3fc" : "#334155"} strokeWidth="1" />
+                    <text x="0" y="3.5" textAnchor="middle" fill="#f8fafc" fontSize="11" fontFamily="ui-monospace, monospace" fontWeight="700">{dim.lengthMm}</text>
                   </g>
                 </g>
               );
@@ -1180,10 +1101,12 @@ export const FlashingDesigner: React.FC<Props> = ({
 
             {/* VARIOBEND REAL BEND ANGLE CIRCULAR ARCS */}
             {bendAngles.map((bend) => {
+              const u = modelUnitsPerScreenPixel;
+              // Keep tight hems and acute folds clean at overview scale; zooming restores the annotation.
+              if (Math.min(dist(bend.pPrev, bend.vertex), dist(bend.pNext, bend.vertex)) / u < 25) return null;
               const isSelected = selectedBendIndex === bend.bendIndex;
               const arcColor = isSelected ? '#38bdf8' : '#64748b';
               const textColor = isSelected ? '#38bdf8' : '#94a3b8';
-              const u = modelUnitsPerScreenPixel;
 
               return (
                 <g
