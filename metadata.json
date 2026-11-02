@@ -1,0 +1,6 @@
+{
+  "name": "Aoraki Architectural Roofing CRM",
+  "description": "Enterprise CRM and project management platform for Archtech (www.archtech.co.nz), preferred installer for The Roofing Store (www.theroofingstore.co.nz), tracking leads, progress, inventory, and site visits.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

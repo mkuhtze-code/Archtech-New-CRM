@@ -1,0 +1,68 @@
+@import "tailwindcss";
+
+:root {
+  /* Archtech Brand Design Tokens (Architectural Steel & Cobalt, NOT Fergus Green) */
+  --brand-primary: #0284c7;
+  --brand-primary-hover: #0369a1;
+  --brand-primary-muted: #f0f9ff;
+  --brand-navy: #0f172a;
+  --brand-steel: #334155;
+  --brand-accent: #0284c7;
+  --surface-page: #f8fafc;
+  --surface-card: #ffffff;
+  --surface-subtle: #f1f5f9;
+  --border-subtle: #e2e8f0;
+  --border-strong: #cbd5e1;
+  --text-primary: #0f172a;
+  --text-muted: #64748b;
+  
+  /* Restrained Trade Stage Accents */
+  --stage-enquiry: #0284c7;
+  --stage-quoting: #d97706;
+  --stage-sent: #7c3aed;
+  --stage-prestart: #2563eb;
+  --stage-onsite: #0d9488;
+  --stage-qa: #059669;
+  --stage-complete: #475569;
+}
+
+@layer base {
+  body {
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    color: #0f172a;
+    background-color: #f8fafc;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  code, kbd, samp, pre {
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  }
+}
+
+/* PWA / mobile safe areas */
+.safe-area {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+html, body, #root {
+  height: 100%;
+  overscroll-behavior: none;
+}
+
+/* Custom Scrollbar for busy trade views */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
