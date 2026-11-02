@@ -59,7 +59,7 @@ export const FlashingProfile3D: React.FC<Props> = ({
       <button onClick={() => onPaintSideChange('inside')} className={`rounded px-2 py-1 ${paintSide === 'inside' ? 'bg-red-700 text-white' : 'text-slate-400'}`}>Inside</button>
     </div>
     <svg viewBox="0 0 500 380" className="h-full w-full touch-none" onPointerDown={startDrag} onPointerMove={moveDrag} onPointerUp={() => { setDrag(null); last.current = null; }} onPointerCancel={() => { setDrag(null); last.current = null; }}
-      onWheel={e => { e.preventDefault(); onZoomChange(Math.max(0.35, Math.min(4, zoom * (e.deltaY < 0 ? 1.12 : 0.89)))); }}>
+      onWheel={e => { e.preventDefault(); e.stopPropagation(); onZoomChange(Math.max(0.35, Math.min(4, zoom * (e.deltaY < 0 ? 1.12 : 0.89)))); }}>
       <defs><linearGradient id="flashing-metal" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#cbd5e1"/><stop offset="50%" stopColor="#64748b"/><stop offset="100%" stopColor="#334155"/></linearGradient></defs>
       {!scene || points.length < 2 ? <text x="250" y="190" textAnchor="middle" fill="#94a3b8" fontSize="13">Draw or select a profile to preview in 3D</text> : <>
         {points.slice(0, -1).map((_, i) => {
