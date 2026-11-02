@@ -1101,10 +1101,12 @@ export const FlashingDesigner: React.FC<Props> = ({
 
             {/* VARIOBEND REAL BEND ANGLE CIRCULAR ARCS */}
             {bendAngles.map((bend) => {
+              const u = modelUnitsPerScreenPixel;
+              // Keep tight hems and acute folds clean at overview scale; zooming restores the annotation.
+              if (Math.min(dist(bend.pPrev, bend.vertex), dist(bend.pNext, bend.vertex)) / u < 25) return null;
               const isSelected = selectedBendIndex === bend.bendIndex;
               const arcColor = isSelected ? '#38bdf8' : '#64748b';
               const textColor = isSelected ? '#38bdf8' : '#94a3b8';
-              const u = modelUnitsPerScreenPixel;
 
               return (
                 <g
