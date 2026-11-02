@@ -1108,7 +1108,7 @@ export const FlashingDesigner: React.FC<Props> = ({
                   setSelectedSegIndex(dim.segIndex);
                   setSelectedBendIndex(null);
                   setDimensionEditor({ kind: 'length', index: dim.segIndex });
-                }} role="button" tabIndex={0} aria-label={\`Edit edge ${dim.segIndex + 1} length\`} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedSegIndex(dim.segIndex); setSelectedBendIndex(null); setDimensionEditor({ kind: 'length', index: dim.segIndex }); } }} className="cursor-pointer">
+                }} role="button" tabIndex={0} aria-label={`Edit edge ${dim.segIndex + 1} length`} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedSegIndex(dim.segIndex); setSelectedBendIndex(null); setDimensionEditor({ kind: 'length', index: dim.segIndex }); } }} className="cursor-pointer">
                   <g transform={`translate(${dim.midpoint.x} ${dim.midpoint.y}) scale(${u})`}>
                     <rect x="-24" y="-9" width="48" height="18" rx="3" fill={isSelected ? "#075985" : "#111827"} stroke={isSelected ? "#7dd3fc" : "#334155"} strokeWidth="1" />
                     <text x="0" y="3.5" textAnchor="middle" fill="#f8fafc" fontSize="11" fontFamily="ui-monospace, monospace" fontWeight="700">{dim.lengthMm}</text>
@@ -1137,7 +1137,7 @@ export const FlashingDesigner: React.FC<Props> = ({
                   }}
                   role="button"
                   tabIndex={0}
-                  aria-label={\`Edit bend ${bend.bendIndex + 1} angle\`}
+                  aria-label={`Edit bend ${bend.bendIndex + 1} angle`}
                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedBendIndex(bend.bendIndex); setSelectedSegIndex(bend.bendIndex); setDimensionEditor({ kind: 'angle', index: bend.bendIndex }); } }}
                   className="cursor-pointer"
                 >
