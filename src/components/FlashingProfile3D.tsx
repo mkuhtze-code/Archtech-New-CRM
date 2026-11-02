@@ -188,8 +188,6 @@ export const FlashingProfile3D: React.FC<Props> = ({
     render();
     setReady(true);
 
-    // Apply persisted zoom to the initial fitted camera distance.
-    camera.position.multiplyScalar(1 / clamp(zoom, 0.25, 5));
     controls.update();
 
     return () => {
@@ -214,7 +212,7 @@ export const FlashingProfile3D: React.FC<Props> = ({
     };
   // Rebuild the physical mesh when geometry or finish changes.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [points, paintSide, onRotationChange, rotation.yaw, rotation.pitch, zoom]);
+  }, [points, paintSide, onRotationChange, rotation.yaw, rotation.pitch]);
 
   useEffect(() => {
     const camera = cameraRef.current;
