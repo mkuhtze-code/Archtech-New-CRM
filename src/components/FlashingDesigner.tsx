@@ -181,6 +181,7 @@ export const FlashingDesigner: React.FC<Props> = ({
   // Active selection
   const [selectedSegIndex, setSelectedSegIndex] = useState<number | null>(null);
   const [selectedBendIndex, setSelectedBendIndex] = useState<number | null>(null);
+  const [dimensionEditor, setDimensionEditor] = useState<{ kind: 'length' | 'angle'; index: number } | null>(null);
 
   // Inspector panel visibility
   const [showInspector, setShowInspector] = useState(true);
@@ -1106,7 +1107,8 @@ export const FlashingDesigner: React.FC<Props> = ({
                   e.stopPropagation();
                   setSelectedSegIndex(dim.segIndex);
                   setSelectedBendIndex(null);
-                }} className="cursor-pointer">
+                  setDimensionEditor({ kind: 'length', index: dim.segIndex });
+                }} role="button" tabIndex={0} aria-label={\`Edit edge ${dim.segIndex + 1} length\`} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedSegIndex(dim.segIndex); setSelectedBendIndex(null); setDimensionEditor({ kind: 'length', index: dim.segIndex }); } }} className="cursor-pointer">
                   <g transform={`translate(${dim.midpoint.x} ${dim.midpoint.y}) scale(${u})`}>
                     <rect x="-24" y="-9" width="48" height="18" rx="3" fill={isSelected ? "#075985" : "#111827"} stroke={isSelected ? "#7dd3fc" : "#334155"} strokeWidth="1" />
                     <text x="0" y="3.5" textAnchor="middle" fill="#f8fafc" fontSize="11" fontFamily="ui-monospace, monospace" fontWeight="700">{dim.lengthMm}</text>
@@ -1131,7 +1133,12 @@ export const FlashingDesigner: React.FC<Props> = ({
                     e.stopPropagation();
                     setSelectedBendIndex(bend.bendIndex);
                     setSelectedSegIndex(bend.bendIndex);
+                    setDimensionEditor({ kind: 'angle', index: bend.bendIndex });
                   }}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={\`Edit bend ${bend.bendIndex + 1} angle\`}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedBendIndex(bend.bendIndex); setSelectedSegIndex(bend.bendIndex); setDimensionEditor({ kind: 'angle', index: bend.bendIndex }); } }}
                   className="cursor-pointer"
                 >
                   {/* Geometric Circular Arc */}
@@ -1574,6 +1581,50 @@ export const FlashingDesigner: React.FC<Props> = ({
                 ))
               )}
             </ul>
+          </div>
+        </div>
+      )}
+
+      {/* POP-OUT DIMENSION EDITOR: clicking a dimension opens a focused edit dialog */}
+      {dimensionEditor && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onMouseDown={(e) => { if (e.target === e.currentTarget) setDimensionEditor(null); }}>
+          <div role="dialog" aria-modal="true" aria-labelledby="dimension-editor-title" className="w-full max-w-sm rounded-2xl border border-slate-700 bg-slate-900 p-5 shadow-2xl">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <h2 id="dimension-editor-title" className="text-base font-bold text-white">
+                  {dimensionEditor.kind === 'length' ? `Edit Edge ${dimensionEditor.index + 1} Length` : `Edit Bend ${dimensionEditor.index + 1} Angle`}
+                </h2>
+                <p className="mt-1 text-xs text-slate-400">Changes update the profile immediately.</p>
+              </div>
+              <button type="button" onClick={() => setDimensionEditor(null)} aria-label="Close dimension editor" className="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-white"><X className="h-5 w-5" /></button>
+            </div>
+            {dimensionEditor.kind === 'length' && segments[dimensionEditor.index] && (
+              <div>
+                <label htmlFor="dimension-length-input" className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-300">Leg length (mm)</label>
+                <input id="dimension-length-input" autoFocus type="number" min="1" max="10000" value={segments[dimensionEditor.index].lengthMm}
+                  onChange={(e) => updateSegmentAt(dimensionEditor.index, { lengthMm: Math.max(1, Number(e.target.value) || 1) })}
+                  onKeyDown={(e) => { if (e.key === 'Enter') setDimensionEditor(null); if (e.key === 'Escape') setDimensionEditor(null); }}
+                  className="w-full rounded-xl border border-sky-600 bg-slate-950 px-4 py-3 font-mono text-2xl font-bold text-white outline-none focus:ring-2 focus:ring-sky-500" />
+                <div className="mt-3 grid grid-cols-4 gap-2">
+                  {[-10, -1, 1, 10].map(step => <button key={step} type="button" onClick={() => updateSegmentAt(dimensionEditor.index, { lengthMm: Math.max(1, segments[dimensionEditor.index].lengthMm + step) })} className="rounded-lg bg-slate-800 py-2 text-sm font-semibold text-slate-200 hover:bg-slate-700">{step > 0 ? `+${step}` : step}</button>)}
+                </div>
+              </div>
+            )}
+            {dimensionEditor.kind === 'angle' && bendAngles.find(b => b.bendIndex === dimensionEditor.index) && (
+              <div>
+                <label htmlFor="dimension-angle-input" className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-300">Interior angle (degrees)</label>
+                <input id="dimension-angle-input" autoFocus type="number" min="1" max="179" value={bendAngles.find(b => b.bendIndex === dimensionEditor.index)!.interiorAngleDeg}
+                  onChange={(e) => updateSegmentAt(dimensionEditor.index, { angleDeg: Math.max(1, Math.min(179, Number(e.target.value) || 1)) })}
+                  onKeyDown={(e) => { if (e.key === 'Enter') setDimensionEditor(null); if (e.key === 'Escape') setDimensionEditor(null); }}
+                  className="w-full rounded-xl border border-amber-600 bg-slate-950 px-4 py-3 font-mono text-2xl font-bold text-white outline-none focus:ring-2 focus:ring-amber-500" />
+                <div className="mt-3 grid grid-cols-4 gap-2">
+                  {[45, 90, 135, 150].map(angle => <button key={angle} type="button" onClick={() => updateSegmentAt(dimensionEditor.index, { angleDeg: angle })} className="rounded-lg bg-slate-800 py-2 text-sm font-semibold text-slate-200 hover:bg-slate-700">{angle}°</button>)}
+                </div>
+              </div>
+            )}
+            <div className="mt-5 flex justify-end">
+              <button type="button" onClick={() => setDimensionEditor(null)} className="rounded-xl bg-sky-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-sky-500">Done</button>
+            </div>
           </div>
         </div>
       )}
